@@ -19,8 +19,8 @@ Route::middleware('guest')->group(function () {
     Route::post('register', [RegisteredUserController::class, 'store']);
     
     // Email verification routes
-    Route::get('register/verify', [RegisteredUserController::class, 'showVerificationForm'])
-        ->name('register.verify.show');
+    Route::get('/verify-email/{email?}', [RegisteredUserController::class, 'showVerificationForm'])
+    ->name('register.verify.show');
     
     Route::post('register/verify', [RegisteredUserController::class, 'verifyCode'])
         ->name('register.verify');

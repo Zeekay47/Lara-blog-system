@@ -1,5 +1,5 @@
 <?php
-
+//-- app/Mail//EmailVerificationMail.php
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
@@ -14,11 +14,14 @@ class EmailVerificationMail extends Mailable
 
     public $name;
     public $code;
+    public $verificationUrl;
 
-    public function __construct($name, $code)
+
+    public function __construct($name, $code, $email)
     {
         $this->name = $name;
         $this->code = $code;
+        $this->verificationUrl = route('register.verify.show', ['email' => $email]);
     }
 
     public function envelope(): Envelope

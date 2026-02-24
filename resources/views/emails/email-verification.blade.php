@@ -70,6 +70,22 @@
             text-align: center;
             margin-top: 20px;
         }
+        .manual-link {
+            text-align: center;
+            word-break: break-all;
+            background: #f5f5f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #706f6c;
+        }
+        .manual-link a {
+            color: #f53003;
+            text-decoration: none;
+        }
+        .manual-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -86,6 +102,10 @@
             <div class="code">{{ $code }}</div>
             
             <p style="text-align: center;">Enter this 5-digit code on the verification page to activate your account.</p>
+            
+            <div class="manual-link">
+                <a href="{{ $verificationUrl }}">{{ $verificationUrl }}</a>
+            </div>
             
             <div class="expiry">
                 <strong>Note:</strong> This code will expire in 10 minutes.

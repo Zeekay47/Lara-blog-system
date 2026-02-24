@@ -64,7 +64,7 @@ class RegisteredUserController extends Controller
 
         // Send verification email
         try {
-            Mail::to($request->email)->send(new EmailVerificationMail($request->name, $verificationCode));
+            Mail::to($request->email)->send(new EmailVerificationMail($request->name, $verificationCode, $request->email));
         } catch (\Exception $e) {
             $verification->delete();
             return redirect()->back()
@@ -83,13 +83,52 @@ class RegisteredUserController extends Controller
     /**
      * Show the verification form.
      */
-    public function showVerificationForm()
+    public function showVerificationForm(Request $request)
     {
+        $email = $request->query('email'); // Get email from URL query parameter
+
+        // If email is provided in URL, validate it
+        if ($email) {
+            $verification = EmailVerification::where('email', $email)->first();
+
+            if (!$verification) {
+                return redirect()->route('register')
+                    ->withErrors(['email' => 'No verification pending for this email. Please register again.']);
+            }
+
+            if ($verification->isExpired()) {
+                $verification->delete();
+                return redirect()->route('register')
+                    ->withErrors(['email' => 'Verification code expired. Please register again.']);
+            }
+
+            // Store email in session for this device
+            session(['verification_email' => $email]);
+
+            // Store the actual expiration timestamp in session
+            session(['verification_expires_at' => $verification->expires_at->timestamp]);
+        }
+
+        // Check if email exists in session (for users who were redirected after registration)
         if (!session()->has('verification_email')) {
             return redirect()->route('register');
         }
 
-        return view('auth.verify-email');
+        // If we don't have expiration time in session, try to get it from database
+        if (!session()->has('verification_expires_at')) {
+            $verification = EmailVerification::where('email', session('verification_email'))->first();
+            if ($verification) {
+                session(['verification_expires_at' => $verification->expires_at->timestamp]);
+            } else {
+                // If no verification found, redirect to register
+                return redirect()->route('register')
+                    ->withErrors(['email' => 'Verification record not found. Please register again.']);
+            }
+        }
+
+        return view('auth.verify-email', [
+            'expiresAt' => session('verification_expires_at')
+        ]);
     }
 
     /**
@@ -180,9 +219,16 @@ class RegisteredUserController extends Controller
             'expires_at' => now()->addMinutes(10),
         ]);
 
-        // Send new code
+        // Update the session with new expiration time
+        session(['verification_expires_at' => $verification->expires_at->timestamp]);
+
+        // Send new code with email parameter
         try {
-            Mail::to($email)->send(new EmailVerificationMail($verification->name, $newCode));
+            Mail::to($email)->send(new EmailVerificationMail(
+                $verification->name, 
+                $newCode,
+                $email
+            ));
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withErrors(['resend' => 'Failed to resend verification code. Please try again.']);

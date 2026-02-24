@@ -3,28 +3,56 @@
         code: ['', '', '', '', ''],
         loading: false,
         resendLoading: false,
-        timer: 600, // 10 minutes in seconds
+        expiresAt: {{ $expiresAt }},
+        timer: 0,
         timerInterval: null,
+        isExpired: false,
         
         init() {
+            this.calculateRemainingTime();
             this.startTimer();
             this.focusFirst();
+            
+            // Check if already expired
+            if (this.timer <= 0) {
+                this.isExpired = true;
+            }
+        },
+        
+        calculateRemainingTime() {
+            const now = Math.floor(Date.now() / 1000);
+            this.timer = Math.max(0, this.expiresAt - now);
         },
         
         startTimer() {
             this.timerInterval = setInterval(() => {
                 if (this.timer > 0) {
                     this.timer--;
-                } else {
-                    clearInterval(this.timerInterval);
+                    if (this.timer === 0) {
+                        this.isExpired = true;
+                        this.handleExpiration();
+                    }
                 }
             }, 1000);
         },
         
+        handleExpiration() {
+            // Optionally show a message or disable inputs
+            clearInterval(this.timerInterval);
+        },
+        
         formatTime() {
+            if (this.timer <= 0) return 'Expired';
+            
             const minutes = Math.floor(this.timer / 60);
             const seconds = this.timer % 60;
             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        },
+        
+        getTimerClass() {
+            if (this.timer <= 0) return 'text-red-600 dark:text-red-400';
+            if (this.timer < 60) return 'text-orange-600 dark:text-orange-400';
+            return 'text-[#f53003]';
         },
         
         focusFirst() {
@@ -74,6 +102,11 @@
         },
         
         submitForm() {
+            if (this.isExpired) {
+                alert('This verification code has expired. Please request a new one.');
+                return;
+            }
+            
             if (this.code.some(digit => digit === '')) {
                 alert('Please enter all 5 digits');
                 return;
@@ -138,6 +171,22 @@
                 </div>
             @endif
 
+            <!-- Expired Message -->
+            <div x-show="isExpired" class="rounded-sm bg-red-50 dark:bg-red-900/20 p-4" data-aos="fade-up" x-cloak>
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700 dark:text-red-300">
+                            This verification code has expired. Please request a new one.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Verification Code Input Form -->
             <div class="mt-8 space-y-6" data-aos="fade-up" data-aos-delay="200">
                 <form method="POST" action="{{ route('register.verify') }}" x-ref="verifyForm">
@@ -160,17 +209,23 @@
                                     @input="handleInput(index, $event)"
                                     @keydown="handleKeydown(index, $event)"
                                     class="w-14 h-14 text-center text-2xl font-bold border-2 border-[#e3e3e0] dark:border-[#3E3E3A] bg-white dark:bg-[#161615] rounded-sm focus:outline-none focus:border-[#f53003] focus:ring-2 focus:ring-[#f53003] transition-all duration-300 text-[#1b1b18] dark:text-[#EDEDEC]"
-                                    :class="{ 'border-[#f53003] ring-2 ring-[#f53003]': code[index] }"
-                                    :disabled="loading"
+                                    :class="{ 
+                                        'border-[#f53003] ring-2 ring-[#f53003]': code[index] && !isExpired,
+                                        'border-gray-300 bg-gray-100': isExpired
+                                    }"
+                                    :disabled="loading || isExpired"
                                 />
                             </template>
                         </div>
 
-                        <!-- Timer -->
+                        <!-- Real-time Timer -->
                         <div class="mt-4 text-center">
                             <div class="text-sm text-[#706f6c] dark:text-[#A1A09A]">
                                 Code expires in 
-                                <span class="font-mono font-bold text-[#f53003]" x-text="formatTime()"></span>
+                                <span class="font-mono font-bold" :class="getTimerClass()" x-text="formatTime()"></span>
+                            </div>
+                            <div x-show="timer < 60 && timer > 0" class="mt-1 text-xs text-orange-600 dark:text-orange-400">
+                                ⚠️ Code expiring soon!
                             </div>
                         </div>
                     </div>
@@ -180,7 +235,7 @@
                         <button
                             type="button"
                             @click="submitForm"
-                            :disabled="loading || code.some(digit => digit === '')"
+                            :disabled="loading || code.some(digit => digit === '') || isExpired"
                             class="w-full justify-center px-6 py-3 bg-[#1b1b18] dark:bg-[#eeeeec] text-white dark:text-[#1C1C1A] rounded-sm hover:bg-black dark:hover:bg-white transition-all duration-300 hover:scale-105 hover:shadow-xl font-medium relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span class="relative z-10 flex items-center justify-center gap-2">
@@ -190,7 +245,7 @@
                                 <svg x-show="loading" class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                 </svg>
-                                <span x-text="loading ? 'Verifying...' : 'Verify Code'"></span>
+                                <span x-text="loading ? 'Verifying...' : (isExpired ? 'Code Expired' : 'Verify Code')"></span>
                             </span>
                             <span class="absolute inset-0 bg-gradient-to-r from-[#f53003] to-[#ff8a5c] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                         </button>
@@ -203,7 +258,7 @@
                     <button
                         type="button"
                         @click="resendCode"
-                        :disabled="resendLoading || timer > 0"
+                        :disabled="resendLoading || (timer > 0 && !isExpired)"
                         class="w-full justify-center px-6 py-3 bg-transparent border-2 border-[#f53003] text-[#f53003] rounded-sm hover:bg-[#fff2f2] dark:hover:bg-[#1D0002] transition-all duration-300 hover:scale-105 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span class="flex items-center justify-center gap-2">
@@ -213,7 +268,7 @@
                             <svg x-show="resendLoading" class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                             </svg>
-                            <span x-text="resendLoading ? 'Sending...' : (timer > 0 ? `Resend Code (${formatTime()})` : 'Resend Code')"></span>
+                            <span x-text="resendLoading ? 'Sending...' : (timer > 0 && !isExpired ? 'Resend Code' : 'Request New Code')"></span>
                         </span>
                     </button>
                 </form>
@@ -235,7 +290,8 @@
                 <ul class="text-xs text-[#706f6c] dark:text-[#A1A09A] space-y-1 list-disc list-inside">
                     <li>Check your spam/junk folder</li>
                     <li>Make sure you entered the correct email address</li>
-                    <li>The code expires in 10 minutes - request a new one if needed</li>
+                    <li>The code expires in 10 minutes from when it was sent</li>
+                    <li>Request a new code after expiration</li>
                 </ul>
             </div>
         </div>
